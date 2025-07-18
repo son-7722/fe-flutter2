@@ -7,14 +7,22 @@ class BalanceHistoryScreen extends StatefulWidget {
   @override
   State<BalanceHistoryScreen> createState() => _BalanceHistoryScreenState();
 }
-//dsdadad//
 
 class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
   List<dynamic> history = [];
+  bool isLoading = true;
   String search = '';
-  String selectedType = 'Tất cả loại';
   String selectedStatus = 'Tất cả trạng thái';
+  String selectedType = 'Tất cả loại';
   String selectedTime = 'Tất cả thời gian';
+  int? currentUserId; // Lưu current user ID
+
+  final List<String> statusOptions = [
+    'Tất cả trạng thái',
+    'Thành công',
+    'Đang xử lý',
+    'Thất bại',
+  ];
 
   final List<String> typeOptions = [
     'Tất cả loại',
@@ -23,12 +31,7 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
     'Thuê',
     'Donate',
   ];
-  final List<String> statusOptions = [
-    'Tất cả trạng thái',
-    'Thành công',
-    'Đang xử lý',
-    'Thất bại',
-  ];
+
   final List<String> timeOptions = [
     'Tất cả thời gian',
     '7 ngày gần nhất',
@@ -38,7 +41,12 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    loadHistory();
+    _getCurrentUserId().then((id) {
+      setState(() {
+        currentUserId = id;
+      });
+      loadHistory();
+    });
   }
 
   Future<void> loadHistory() async {
@@ -154,22 +162,26 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
 
   List<dynamic> _filteredHistory() {
     return history.where((item) {
-      final matchSearch = search.isEmpty ||
-          (item['id']?.toString().contains(search) ?? false);
-      // Lọc theo trạng thái
+      String type = (item['type'] ?? '').toString().toUpperCase();
+      if (type == 'DONATE' && currentUserId != null) {
+        final paymentUserId = item['user']?['id'] ?? item['userId'];
+        final paymentPlayerId = item['player']?['id'] ?? item['playerId'];
+        // Chỉ hiện giao dịch mà user là người nhận
+        if (currentUserId == paymentPlayerId && currentUserId != paymentUserId) return true;
+        return false;
+      }
+      // Các filter khác giữ nguyên
+      final matchSearch = search.isEmpty || (item['id']?.toString().contains(search) ?? false);
       String status = (item['status'] ?? '').toString().toUpperCase();
       bool matchStatus = selectedStatus == 'Tất cả trạng thái' ||
         (selectedStatus == 'Thành công' && status == 'COMPLETED') ||
         (selectedStatus == 'Đang xử lý' && status == 'PENDING') ||
         (selectedStatus == 'Thất bại' && status == 'FAILED');
-      // Lọc theo loại giao dịch
-      String type = (item['type'] ?? '').toString().toUpperCase();
       bool matchType = selectedType == 'Tất cả loại' ||
         (selectedType == 'Nạp tiền' && type == 'TOPUP') ||
         (selectedType == 'Rút tiền' && type == 'WITHDRAW') ||
         (selectedType == 'Thuê' && type == 'HIRE') ||
         (selectedType == 'Donate' && type == 'DONATE');
-      // Lọc theo thời gian
       DateTime? createdAt;
       try {
         createdAt = DateTime.tryParse(item['createdAt'] ?? item['dateTime'] ?? '');
@@ -188,121 +200,102 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
   }
 
   Widget _buildHistoryItem(Map<String, dynamic> item) {
-    return FutureBuilder<int?>(
-      future: _getCurrentUserId(),
-      builder: (context, snapshot) {
-        // Map trạng thái nếu không có statusText
-        String status = (item['status'] ?? '').toString().toUpperCase();
-        String statusText = item['statusText'] ?? '';
-        Color statusColor = Colors.grey;
-        if (statusText.isEmpty) {
-          switch (status) {
-            case 'COMPLETED':
-              statusText = 'Thành công';
-              statusColor = Colors.green;
-              break;
-            case 'PENDING':
-              statusText = 'Đang xử lý';
-              statusColor = Colors.orange;
-              break;
-            case 'FAILED':
-              statusText = 'Thất bại';
-              statusColor = Colors.red;
-              break;
-            default:
-              statusText = status;
-              statusColor = Colors.grey;
-          }
-        } else if (item['statusColor'] != null) {
-          try {
-            statusColor = Color(int.parse(item['statusColor'].replaceFirst('#', '0xff')));
-          } catch (_) {}
-        }
-        // Xác định loại giao dịch để hiển thị dấu và màu
-        String type = (item['type'] ?? '').toString().toUpperCase();
-        String method = (item['paymentMethod'] ?? '').toString().toUpperCase();
-        bool isTopup = type == 'TOPUP';
-        bool isWithdraw = type == 'WITHDRAW';
-        bool isDonate = type == 'DONATE';
-        String coinText = '';
-        Color coinColor = Colors.amber;
-        if (isTopup) {
-          coinText = '+${item['coin']} xu';
-          coinColor = Colors.green;
-        } else if (isWithdraw) {
-          coinText = '-${item['coin']} xu';
-          coinColor = Colors.red;
-        } else if (isDonate) {
-          // Kiểm tra xem user hiện tại là người gửi hay nhận donate
-          final currentUserId = snapshot.data;
-          final paymentUserId = item['user']?['id'] ?? item['userId'];
-          final paymentPlayerId = item['player']?['id'] ?? item['playerId'];
-          
-          if (currentUserId == paymentUserId) {
-            // Người gửi donate: trừ xu, dấu -, màu đỏ
-            coinText = '-${item['coin']} xu';
-            coinColor = Colors.red;
-          } else if (currentUserId == paymentPlayerId) {
-            // Người nhận donate: cộng xu, dấu +, màu xanh
-            coinText = '+${item['coin']} xu';
-            coinColor = Colors.green;
-          } else {
-            // Trường hợp khác
-            coinText = '${item['coin']} xu';
-            coinColor = Colors.amber;
-          }
-        } else {
-          coinText = '${item['coin']} xu';
-          coinColor = Colors.amber;
-        }
-        return Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.03),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
+    // Không dùng FutureBuilder nữa, dùng currentUserId từ state
+    String status = (item['status'] ?? '').toString().toUpperCase();
+    String statusText = item['statusText'] ?? '';
+    Color statusColor = Colors.grey;
+    if (statusText.isEmpty) {
+      switch (status) {
+        case 'COMPLETED':
+          statusText = 'Thành công';
+          statusColor = Colors.green;
+          break;
+        case 'PENDING':
+          statusText = 'Đang xử lý';
+          statusColor = Colors.orange;
+          break;
+        case 'FAILED':
+          statusText = 'Thất bại';
+          statusColor = Colors.red;
+          break;
+        default:
+          statusText = status;
+          statusColor = Colors.grey;
+      }
+    } else if (item['statusColor'] != null) {
+      try {
+        statusColor = Color(int.parse(item['statusColor'].replaceFirst('#', '0xff')));
+      } catch (_) {}
+    }
+    String type = (item['type'] ?? '').toString().toUpperCase();
+    String coinText = '';
+    Color coinColor = Colors.amber;
+    if (type == 'TOPUP') {
+      coinText = '+${item['coin']} xu';
+      coinColor = Colors.green;
+    } else if (type == 'WITHDRAW') {
+      coinText = '-${item['coin']} xu';
+      coinColor = Colors.red;
+    } else if (type == 'DONATE' && currentUserId != null) {
+      final paymentUserId = item['user']?['id'] ?? item['userId'];
+      final paymentPlayerId = item['player']?['id'] ?? item['playerId'];
+      if (currentUserId == paymentUserId) {
+        coinText = '-${item['coin']} xu';
+        coinColor = Colors.red;
+      } else if (currentUserId == paymentPlayerId) {
+        coinText = '+${item['coin']} xu';
+        coinColor = Colors.green;
+      }
+    } else {
+      coinText = '${item['coin']} xu';
+      coinColor = Colors.amber;
+    }
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item['createdAt'] ?? item['dateTime'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          const SizedBox(height: 4),
+          Row(
             children: [
-              Text(item['createdAt'] ?? item['dateTime'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  const Icon(Icons.monetization_on, color: Colors.amber, size: 20),
-                  const SizedBox(width: 4),
-                  Text(coinText, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: coinColor)),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text('Mã giao dịch: ${item['id']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                  const Spacer(),
-                  if (statusText.isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        statusText,
-                        style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ),
-                ],
-              ),
+              const Icon(Icons.monetization_on, color: Colors.amber, size: 20),
+              const SizedBox(width: 4),
+              Text(coinText, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: coinColor)),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text('Mã giao dịch: ${item['id']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+              const Spacer(),
+              if (statusText.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    statusText,
+                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 } 
