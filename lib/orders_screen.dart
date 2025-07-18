@@ -33,7 +33,7 @@ class _OrdersScreenState extends State<OrdersScreen> {
   ];
   final List<Map<String, String>> typeList = [
     {'value': 'HIRED', 'label': 'Tôi thuê'},
-    {'value': 'HIREE', 'label': 'Tôi được thuê'},
+    {'value': 'HIRING', 'label': 'Tôi được thuê'},
   ];
 
   @override

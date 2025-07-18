@@ -166,7 +166,9 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
       if (type == 'DONATE' && currentUserId != null) {
         final paymentUserId = item['user']?['id'] ?? item['userId'];
         final paymentPlayerId = item['player']?['id'] ?? item['playerId'];
-        // Chỉ hiện giao dịch mà user là người nhận
+        // Người gửi: chỉ thấy giao dịch gửi (dấu trừ)
+        if (currentUserId == paymentUserId && currentUserId != paymentPlayerId) return true;
+        // Người nhận: chỉ thấy giao dịch nhận (dấu cộng)
         if (currentUserId == paymentPlayerId && currentUserId != paymentUserId) return true;
         return false;
       }

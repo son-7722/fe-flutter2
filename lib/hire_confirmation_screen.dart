@@ -3,6 +3,7 @@ import 'api_service.dart';
 import 'dart:async';
 import 'utils/notification_helper.dart';
 import 'rate_player_screen.dart';
+import 'config/api_config.dart';
 
 class HireConfirmationScreen extends StatefulWidget {
   final String playerName;
@@ -38,6 +39,7 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
   Duration? remainingTime;
   Map<String, dynamic>? currentUser;
   bool isPlayer = false;
+  String? hirerAvatarUrl;
 
   @override
   void initState() {
@@ -64,6 +66,13 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
       orderStatus = detail != null ? detail['status']?.toString() : null;
       isLoading = false;
     });
+    // Nếu là player, lấy avatar của hirer
+    if (detail != null && detail['hirerId'] != null) {
+      final user = await ApiService.getUserById(int.parse(detail['hirerId'].toString()));
+      setState(() {
+        hirerAvatarUrl = user?['avatar'] ?? '';
+      });
+    }
     _startCountdown();
   }
 
@@ -104,6 +113,12 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
     }
   }
 
+  String getFullAvatarUrl(String? url) {
+    if (url == null || url.isEmpty || url == 'null') return '';
+    if (url.startsWith('http')) return url;
+    return ApiConfig.baseUrl + '/' + url;
+  }
+
   Future<void> _confirmOrder() async {
     try {
       final success = await ApiService.confirmHire(widget.orderId);
@@ -140,6 +155,27 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi: ${e.toString()}')),
+      );
+    }
+  }
+
+  // Cho phép người thuê hủy đơn
+  Future<void> _cancelOrder() async {
+    try {
+      final success = await ApiService.rejectHire(widget.orderId);
+      if (success == true) {
+        setState(() { orderStatus = 'REJECTED'; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã hủy đơn thành công!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Hủy đơn thất bại!')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Lỗi:  e.toString()}')),
       );
     }
   }
@@ -238,12 +274,30 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
                 children: [
                   CircleAvatar(
                     radius: 32,
-                    backgroundImage: (playerAvatarUrl.isNotEmpty && playerAvatarUrl != 'null')
-                        ? NetworkImage(playerAvatarUrl)
-                        : null,
-                    child: (playerAvatarUrl.isEmpty || playerAvatarUrl == 'null')
-                        ? const Icon(Icons.person, size: 36, color: Colors.deepOrange)
-                        : null,
+                    backgroundImage: (() {
+                      String? userId;
+                      if (isCurrentPlayer) {
+                        userId = orderDetail?['hirerId']?.toString();
+                      } else {
+                        userId = orderDetail?['playerId']?.toString();
+                      }
+                      if (userId != null && userId.isNotEmpty) {
+                        return NetworkImage('${ApiConfig.baseUrl}/api/auth/avatar/$userId');
+                      }
+                      return null;
+                    })(),
+                    child: (() {
+                      String? userId;
+                      if (isCurrentPlayer) {
+                        userId = orderDetail?['hirerId']?.toString();
+                      } else {
+                        userId = orderDetail?['playerId']?.toString();
+                      }
+                      if (userId == null || userId.isEmpty) {
+                        return const Icon(Icons.person, size: 36, color: Colors.deepOrange);
+                      }
+                      return null;
+                    })(),
                   ),
                   const SizedBox(width: 20),
                   Expanded(
@@ -387,6 +441,27 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
               ),
             ),
             const SizedBox(height: 22),
+            // Hiển thị trạng thái lớn cho cả người thuê và người được thuê
+            if (orderStatus == 'REJECTED')
+              Center(
+                child: Column(
+                  children: const [
+                    Icon(Icons.cancel, color: Colors.red, size: 64),
+                    SizedBox(height: 12),
+                    Text('Đơn đã được hủy', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 22)),
+                  ],
+                ),
+              ),
+            if (orderStatus == 'CONFIRMED')
+              Center(
+                child: Column(
+                  children: const [
+                    Icon(Icons.check_circle, color: Colors.green, size: 64),
+                    SizedBox(height: 12),
+                    Text('Đơn đã được xác nhận', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 22)),
+                  ],
+                ),
+              ),
             // Lưu ý/nút xác nhận/từ chối chỉ cho player
             if (isCurrentPlayer) ...[
               if (orderStatus == 'PENDING' || orderStatus == null)
@@ -463,27 +538,24 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
                     ),
                   ],
                 ),
-              if (orderStatus == 'CONFIRMED')
-                Center(
-                  child: Column(
-                    children: const [
-                      Icon(Icons.check_circle, color: Colors.green, size: 64),
-                      SizedBox(height: 12),
-                      Text('Đơn đã xác nhận thành công', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 22)),
-                    ],
-                  ),
-                ),
-              if (orderStatus == 'REJECTED')
-                Center(
-                  child: Column(
-                    children: const [
-                      Icon(Icons.cancel, color: Colors.red, size: 64),
-                      SizedBox(height: 12),
-                      Text('Đơn đã từ chối thành công', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 22)),
-                    ],
-                  ),
-                ),
             ],
+            // Thêm nút hủy cho người thuê
+            if (isCurrentUser && (orderStatus == 'PENDING' || orderStatus == null))
+              Padding(
+                padding: const EdgeInsets.only(top: 12.0),
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.cancel, color: Colors.deepOrange),
+                  onPressed: _cancelOrder,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.deepOrange,
+                    side: const BorderSide(color: Colors.deepOrange, width: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 18),
+                    textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  label: const Text('HỦY ĐƠN'),
+                ),
+              ),
             // Chỉ hiển thị nút đánh giá khi đơn đã hoàn thành và là người thuê
             if (!isCurrentPlayer && orderStatus == 'COMPLETED')
               FutureBuilder<Map<String, dynamic>?> (
