@@ -154,7 +154,18 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
         }
         
         // Lấy số tiền được hoàn lại từ response
-        final refundedCoin = response['refundedCoin'] ?? 0;
+        final data = response['data'];
+        final refundedCoin = data?['refundedCoin'] ?? 0;
+        
+        // Debug: In ra response để kiểm tra
+        print('Cancel order response: $response');
+        print('Response type: ${response.runtimeType}');
+        print('Response keys: ${response.keys.toList()}');
+        print('Data object: $data');
+        print('Refunded coin: $refundedCoin');
+        
+        // Nếu refundedCoin là 0, sử dụng số tiền đơn hàng
+        final displayRefundAmount = refundedCoin > 0 ? refundedCoin : widget.totalCoin;
         
         // Sau khi hủy đơn, reload số dư xu nếu có hàm cập nhật
         if (mounted) {
@@ -164,7 +175,7 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Đã hủy đơn thành công! Số tiền ${refundedCoin} xu đã được hoàn lại vào ví của bạn.'),
+            content: Text('Đã hủy đơn thành công! Số tiền ${formatXu(displayRefundAmount)} xu đã được hoàn lại vào ví của bạn.'),
             duration: const Duration(seconds: 4),
           ),
         );
@@ -188,7 +199,18 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
         setState(() { orderStatus = 'REJECTED'; });
         
         // Lấy số tiền được hoàn lại từ response
-        final refundedCoin = response['refundedCoin'] ?? 0;
+        final data = response['data'];
+        final refundedCoin = data?['refundedCoin'] ?? 0;
+        
+        // Debug: In ra response để kiểm tra
+        print('Reject order response: $response');
+        print('Response type: ${response.runtimeType}');
+        print('Response keys: ${response.keys.toList()}');
+        print('Data object: $data');
+        print('Refunded coin: $refundedCoin');
+        
+        // Nếu refundedCoin là 0, sử dụng số tiền đơn hàng
+        final displayRefundAmount = refundedCoin > 0 ? refundedCoin : widget.totalCoin;
         
         // Sau khi từ chối đơn, quay lại màn hình trước
         if (mounted) {
@@ -198,7 +220,7 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
         }
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Đã từ chối đơn thành công! Số tiền ${refundedCoin} xu đã được hoàn lại cho người thuê.'),
+            content: Text('Đã từ chối đơn thành công! Số tiền ${formatXu(displayRefundAmount)} xu đã được hoàn lại cho người thuê.'),
             duration: const Duration(seconds: 4),
           ),
         );

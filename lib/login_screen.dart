@@ -4,7 +4,7 @@ import 'register_screen.dart';
 import 'main.dart';
 import 'api_service.dart';
 import 'utils/notification_helper.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
+import 'utils/firebase_helper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -92,10 +92,15 @@ class _LoginScreenState extends State<LoginScreen> {
         // Sau khi login thành công, lấy thông tin user
         final user = await ApiService.getCurrentUser();
         if (user != null) {
-          // Cập nhật device token nếu cần
-          String? deviceToken = await FirebaseMessaging.instance.getToken();
-          if (deviceToken != null) {
-            await ApiService.updateDeviceToken(deviceToken);
+          // Cập nhật device token nếu cần - sử dụng FirebaseHelper
+          try {
+            String? deviceToken = await FirebaseHelper.getDeviceToken();
+            if (deviceToken != null) {
+              await ApiService.updateDeviceToken(deviceToken);
+            }
+          } catch (firebaseError) {
+            print('Lỗi Firebase khi lấy device token: $firebaseError');
+            // Không crash app khi có lỗi Firebase
           }
           
           showSuccessSnackBar('Đăng nhập thành công!');

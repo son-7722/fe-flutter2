@@ -11,6 +11,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'explore_screen.dart';
+import 'utils/firebase_helper.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -95,27 +96,10 @@ class PlayerDuoApp extends StatelessWidget {
 
 void setupFCM() async {
   try {
-    FirebaseMessaging messaging = FirebaseMessaging.instance;
-    
-    // Kiểm tra và yêu cầu quyền thông báo
-    NotificationSettings settings = await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      provisional: false,
-    );
-    
-    print('Trạng thái quyền thông báo: ${settings.authorizationStatus}');
-    
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      // Lấy token thiết bị
-      String? token = await messaging.getToken();
-      if (token != null) {
-        print('Token thiết bị: $token');
-        // Lưu token vào secure storage
-        final storage = FlutterSecureStorage();
-        await storage.write(key: 'fcm_token', value: token);
-      }
+    // Sử dụng FirebaseHelper để thiết lập FCM an toàn
+    bool success = await FirebaseHelper.setupFCM();
+    if (success) {
+      print('FCM được thiết lập thành công');
       
       // Thiết lập xử lý tin nhắn khi app đang chạy
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -151,9 +135,12 @@ void setupFCM() async {
         print('App được mở từ thông báo: ${message.messageId}');
         // Xử lý navigation nếu cần
       });
+    } else {
+      print('Không thể thiết lập FCM');
     }
   } catch (e) {
     print('Lỗi khi thiết lập FCM: $e');
+    // Không crash app khi có lỗi Firebase
   }
 }
 

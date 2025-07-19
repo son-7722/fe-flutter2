@@ -88,9 +88,10 @@ class _HirePlayerScreenState extends State<HirePlayerScreen> {
     } catch (_) {}
   }
 
-  int get totalHours {
-    if (selectedStartTime == null || selectedEndTime == null) return 0;
-    return selectedEndTime!.difference(selectedStartTime!).inMinutes ~/ 60;
+  double get totalHours {
+    if (selectedStartTime == null || selectedEndTime == null) return 0.0;
+    final duration = selectedEndTime!.difference(selectedStartTime!);
+    return duration.inMinutes / 60.0; // Tính chính xác số giờ (bao gồm phần thập phân)
   }
 
   int get totalCoin {
@@ -99,7 +100,10 @@ class _HirePlayerScreenState extends State<HirePlayerScreen> {
         : (widget.player['pricePerHour'] is double)
             ? (widget.player['pricePerHour'] as double).toInt()
             : int.tryParse(widget.player['pricePerHour'].toString().split('.').first) ?? 0;
-    return pricePerHour * (totalHours > 0 ? totalHours : 1);
+    // Tính chính xác chi phí dựa trên số giờ thực tế
+    final exactHours = totalHours;
+    if (exactHours <= 0) return pricePerHour; // Mặc định 1 giờ nếu chưa chọn thời gian
+    return (pricePerHour * exactHours).round(); // Làm tròn để có số nguyên
   }
 
   Future<void> _handleHire() async {
@@ -139,7 +143,7 @@ class _HirePlayerScreenState extends State<HirePlayerScreen> {
         coin: totalCoin,
         startTime: selectedStartTime!,
         endTime: selectedEndTime!,
-        hours: totalHours > 0 ? totalHours : 1,
+        hours: totalHours > 0 ? totalHours.round() : 1, // Làm tròn số giờ để gửi lên server
         userId: userId,
         specialRequest: messageController.text.trim(),
       );
@@ -336,6 +340,67 @@ class _HirePlayerScreenState extends State<HirePlayerScreen> {
                 ),
               ],
             ),
+            const SizedBox(height: 22),
+            // Hiển thị thông tin thời gian thuê và chi phí
+            if (selectedStartTime != null && selectedEndTime != null && selectedEndTime!.isAfter(selectedStartTime!))
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.orange[600], size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Thông tin thuê',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Thời gian thuê:', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${totalHours.toStringAsFixed(1)} giờ',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey[800]),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Chi phí:', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+                              const SizedBox(height: 4),
+                              Text(
+                                '${formatXu(totalCoin)} xu',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange[700]),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: 22),
             Row(
               children: [
