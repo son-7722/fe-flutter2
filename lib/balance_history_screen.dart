@@ -50,10 +50,30 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
   }
 
   Future<void> loadHistory() async {
+    if (selectedType == 'Donate') {
+      // Gọi API donate-history riêng
+      print('Loading donate history...');
+      final data = await ApiService.fetchDonateHistory();
+      print('Donate history response: ${data.length} items');
+      print('Data: $data');
+      setState(() {
+        history = data;
+      });
+    } else {
     final data = await ApiService.fetchBalanceHistory();
+    print('Balance history response: ${data.length} items');
+    print('Selected type: $selectedType');
+    print('All data: $data');
+    // Debug: In ra các giao dịch có type HIRE
+    final hireTransactions = data.where((item) => 
+      (item['type'] ?? '').toString().toUpperCase() == 'HIRE'
+    ).toList();
+    print('HIRE transactions found: ${hireTransactions.length}');
+    print('HIRE transactions: $hireTransactions');
     setState(() {
       history = data;
     });
+    }
   }
 
   Future<int?> _getCurrentUserId() async {
@@ -123,7 +143,10 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
                       child: DropdownButtonFormField<String>(
                         value: selectedType,
                         items: typeOptions.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        onChanged: (v) => setState(() => selectedType = v!),
+                        onChanged: (v) {
+                          setState(() => selectedType = v!);
+                          loadHistory(); // Reload data khi thay đổi filter
+                        },
                         decoration: InputDecoration(
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -161,9 +184,21 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
   }
 
   List<dynamic> _filteredHistory() {
+    if (selectedType == 'Donate') {
+      // Không cần filter lại, chỉ phân biệt gửi/nhận khi render
+      return history;
+    }
+    
+    print('Filtering history for type: $selectedType');
+    print('Total history items: ${history.length}');
+    
     return history.where((item) {
       String type = (item['type'] ?? '').toString().toUpperCase();
+      print('Processing item: type=$type, id=${item['id']}');
+      
       if (type == 'DONATE' && currentUserId != null) {
+        // Chỉ hiển thị ở tab Donate, không hiển thị ở các tab khác
+        if (selectedType != 'Donate') return false;
         final paymentUserId = item['user']?['id'] ?? item['userId'];
         final paymentPlayerId = item['player']?['id'] ?? item['playerId'];
         // Người gửi: chỉ thấy giao dịch gửi (dấu trừ)
@@ -184,6 +219,18 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
         (selectedType == 'Rút tiền' && type == 'WITHDRAW') ||
         (selectedType == 'Thuê' && type == 'HIRE') ||
         (selectedType == 'Donate' && type == 'DONATE');
+      
+      print('Item $type: matchSearch=$matchSearch, matchStatus=$matchStatus, matchType=$matchType');
+      
+      // Nếu đang chọn 'Rút tiền' thì chỉ lấy type == 'WITHDRAW'
+      if (selectedType == 'Rút tiền' && type != 'WITHDRAW') return false;
+      // Nếu đang chọn 'Nạp tiền' thì chỉ lấy type == 'TOPUP'
+      if (selectedType == 'Nạp tiền' && type != 'TOPUP') return false;
+      // Nếu đang chọn 'Thuê' thì chỉ lấy type == 'HIRE'
+      if (selectedType == 'Thuê' && type != 'HIRE') return false;
+      // Nếu đang chọn 'Donate' thì chỉ lấy type == 'DONATE'
+      if (selectedType == 'Donate' && type != 'DONATE') return false;
+      
       DateTime? createdAt;
       try {
         createdAt = DateTime.tryParse(item['createdAt'] ?? item['dateTime'] ?? '');
@@ -197,12 +244,69 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
           matchTime = createdAt.isAfter(now.subtract(const Duration(days: 30)));
         }
       }
-      return matchSearch && matchStatus && matchType && matchTime;
+      
+      bool result = matchSearch && matchStatus && matchType && matchTime;
+      print('Item $type final result: $result');
+      return result;
     }).toList();
   }
 
   Widget _buildHistoryItem(Map<String, dynamic> item) {
-    // Không dùng FutureBuilder nữa, dùng currentUserId từ state
+    String type = (item['type'] ?? '').toString().toUpperCase();
+    String coinText = '';
+    Color coinColor = Colors.amber;
+    if (selectedType == 'Donate' && currentUserId != null) {
+      // Phân biệt gửi/nhận dựa vào description
+      String description = (item['description'] ?? '').toString();
+      if (description.contains('Nhận donate từ')) {
+        // Người nhận donate - hiển thị dấu +
+        coinText = '+${item['coin']} xu';
+        coinColor = Colors.green;
+      } else if (description.contains('Donate cho')) {
+        // Người gửi donate - hiển thị dấu -
+        coinText = '-${item['coin']} xu';
+        coinColor = Colors.red;
+      } else {
+        coinText = '${item['coin']} xu';
+        coinColor = Colors.amber;
+      }
+    } else {
+      if (type == 'TOPUP') {
+        coinText = '+${item['coin']} xu';
+        coinColor = Colors.green;
+      } else if (type == 'WITHDRAW') {
+        coinText = '-${item['coin']} xu';
+        coinColor = Colors.red;
+      } else if (type == 'HIRE' && currentUserId != null) {
+        final paymentUserId = item['user']?['id'] ?? item['userId'];
+        final paymentPlayerId = item['player']?['id'] ?? item['playerId'];
+        if (currentUserId == paymentUserId) {
+          // Người thuê - trừ tiền
+          coinText = '-${item['coin']} xu';
+          coinColor = Colors.red;
+        } else if (currentUserId == paymentPlayerId) {
+          // Người được thuê - cộng tiền
+          coinText = '+${item['coin']} xu';
+          coinColor = Colors.green;
+        } else {
+          coinText = '${item['coin']} xu';
+          coinColor = Colors.amber;
+        }
+      } else if (type == 'DONATE' && currentUserId != null) {
+        final paymentUserId = item['user']?['id'] ?? item['userId'];
+        final paymentPlayerId = item['player']?['id'] ?? item['playerId'];
+        if (currentUserId == paymentUserId) {
+          coinText = '-${item['coin']} xu';
+          coinColor = Colors.red;
+        } else if (currentUserId == paymentPlayerId) {
+          coinText = '+${item['coin']} xu';
+          coinColor = Colors.green;
+        }
+      } else {
+        coinText = '${item['coin']} xu';
+        coinColor = Colors.amber;
+      }
+    }
     String status = (item['status'] ?? '').toString().toUpperCase();
     String statusText = item['statusText'] ?? '';
     Color statusColor = Colors.grey;
@@ -228,29 +332,6 @@ class _BalanceHistoryScreenState extends State<BalanceHistoryScreen> {
       try {
         statusColor = Color(int.parse(item['statusColor'].replaceFirst('#', '0xff')));
       } catch (_) {}
-    }
-    String type = (item['type'] ?? '').toString().toUpperCase();
-    String coinText = '';
-    Color coinColor = Colors.amber;
-    if (type == 'TOPUP') {
-      coinText = '+${item['coin']} xu';
-      coinColor = Colors.green;
-    } else if (type == 'WITHDRAW') {
-      coinText = '-${item['coin']} xu';
-      coinColor = Colors.red;
-    } else if (type == 'DONATE' && currentUserId != null) {
-      final paymentUserId = item['user']?['id'] ?? item['userId'];
-      final paymentPlayerId = item['player']?['id'] ?? item['playerId'];
-      if (currentUserId == paymentUserId) {
-        coinText = '-${item['coin']} xu';
-        coinColor = Colors.red;
-      } else if (currentUserId == paymentPlayerId) {
-        coinText = '+${item['coin']} xu';
-        coinColor = Colors.green;
-      }
-    } else {
-      coinText = '${item['coin']} xu';
-      coinColor = Colors.amber;
     }
     return Container(
       padding: const EdgeInsets.all(12),

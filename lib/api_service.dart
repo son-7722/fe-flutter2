@@ -1374,4 +1374,20 @@ class ApiService {
       return null;
     }
   }
+
+  static Future<List<dynamic>> fetchDonateHistory() async {
+    final token = await storage.read(key: 'jwt');
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/payments/donate-history');
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    );
+    if (response.statusCode == 200 && response.body.isNotEmpty) {
+      return List<dynamic>.from(jsonDecode(response.body));
+    }
+    return [];
+  }
 }

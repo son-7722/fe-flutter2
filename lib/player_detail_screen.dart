@@ -22,9 +22,8 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        icon != null
-            ? Icon(icon, color: Colors.grey, size: 28)
-            : Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.deepOrange)),
+        if (icon != null) Icon(icon, color: Colors.grey, size: 28),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.deepOrange)),
         const SizedBox(height: 4),
         Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54), textAlign: TextAlign.center),
       ],
@@ -259,14 +258,58 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
   Widget _buildPlayerInfo(Map<String, dynamic> player) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _infoRow('Tên:', player['username']),
-          _infoRow('Giá thuê:', _formatXuPerHour(player['pricePerHour'])),
-          _infoRow('Trạng thái:', player['status']),
-          _infoRow('Mô tả:', player['description']),
-        ],
+      child: Card(
+        elevation: 3,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        color: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.person, color: Colors.deepOrange, size: 22),
+                  const SizedBox(width: 8),
+                  Text('Tên:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(player['username'] ?? '', style: TextStyle(color: Colors.black87))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.attach_money, color: Colors.amber, size: 22),
+                  const SizedBox(width: 8),
+                  Text('Giá thuê:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(_formatXuPerHour(player['pricePerHour']), style: TextStyle(color: Colors.black87))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.circle, color: player['status'] == 'AVAILABLE' ? Colors.green : Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  Text('Trạng thái:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(player['status'] ?? '', style: TextStyle(color: Colors.black87))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, color: Colors.blue, size: 22),
+                  const SizedBox(width: 8),
+                  Text('Mô tả:', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(player['description'] ?? '', style: TextStyle(color: Colors.black87))),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -582,7 +625,19 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
                             padding: const EdgeInsets.all(8),
                             child: InkWell(
                               borderRadius: BorderRadius.circular(24),
-                              onTap: () {
+                              onTap: () async {
+                                // Kiểm tra xem user hiện tại có phải là chủ sở hữu player không
+                                final userInfo = await ApiService.getCurrentUser();
+                                final currentUserId = userInfo?['id'];
+                                final playerOwnerId = player['user']?['id'];
+                                
+                                if (currentUserId != null && playerOwnerId != null && currentUserId == playerOwnerId) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text('Bạn không thể donate cho chính mình!')),
+                                  );
+                                  return;
+                                }
+                                
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -666,8 +721,7 @@ class _PlayerDetailScreenState extends State<PlayerDetailScreen> {
                 children: [
                   _StatItem(label: 'Người\nTheo dõi', value: isLoadingStats ? '...' : followerCount.toString()),
                   _StatItem(label: 'Giờ\nĐược thuê', value: isLoadingHireHours ? '...' : (totalHireHours?.toString() ?? '0')),
-                  _StatItem(label: '%\nHoàn thành', value: isLoadingCompletionRate ? '...' : (completionRate?.toStringAsFixed(2) ?? '0.00')),
-                  // Icon báo cáo
+                  // Đã bỏ % hoàn thành
                   Builder(
                     builder: (context) {
                       TextEditingController videoController = TextEditingController();

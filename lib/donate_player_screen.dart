@@ -179,16 +179,6 @@ class _DonatePlayerScreenState extends State<DonatePlayerScreen> {
                     );
                     return;
                   }
-                  // Lấy userId hiện tại
-                  final userInfo = await ApiService.getCurrentUser();
-                  final currentUserId = userInfo?['id'];
-                  final playerUserId = player['userId'] ?? player['id'];
-                  if (currentUserId != null && playerUserId != null && currentUserId == playerUserId) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Bạn không thể donate cho chính mình!')),
-                    );
-                    return;
-                  }
                   final error = await ApiService.donatePlayer(
                     playerId: widget.player['id'] is int ? widget.player['id'] : int.tryParse(widget.player['id'].toString()) ?? 0,
                     coin: coin,
