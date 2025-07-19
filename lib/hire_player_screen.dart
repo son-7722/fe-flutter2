@@ -146,10 +146,17 @@ class _HirePlayerScreenState extends State<HirePlayerScreen> {
       setState(() { isLoading = false; });
 
       if (result != null && result['success'] == true) {
+        // Reload số dư xu sau khi trừ tiền
+        try {
+          await _loadWalletBalance();
+        } catch (e) {
+          print('Lỗi reload số dư xu: $e');
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Yêu cầu thuê đã được gửi. Vui lòng chờ player xác nhận.'),
-            duration: Duration(seconds: 3),
+          SnackBar(
+            content: Text('Yêu cầu thuê đã được gửi. Số tiền ${totalCoin} xu đã được trừ từ ví của bạn. Vui lòng chờ player xác nhận.'),
+            duration: const Duration(seconds: 4),
           ),
         );
         Navigator.pop(context);

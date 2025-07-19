@@ -65,6 +65,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _checkIsPlayer();
       _didCheckPlayer = true;
     }
+    // Lắng nghe khi quay lại từ màn xác nhận đơn để reload số dư xu
+    Future.microtask(() async {
+      final result = ModalRoute.of(context)?.settings.arguments;
+      if (result == true) {
+        await _loadWalletBalance();
+      }
+    });
   }
 
   @override

@@ -139,17 +139,38 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
     }
   }
 
-  Future<void> _rejectOrder() async {
+  // Cho phép người thuê hủy đơn
+  Future<void> _cancelOrder() async {
     try {
-      final success = await ApiService.rejectHire(widget.orderId);
-      if (success == true) {
+      final response = await ApiService.cancelOrder(widget.orderId);
+      if (response != null && response['success'] == true) {
         setState(() { orderStatus = 'REJECTED'; });
+        
+        // Reload số dư xu ngay lập tức
+        try {
+          await ApiService.fetchWalletBalance();
+        } catch (e) {
+          print('Lỗi reload số dư xu: $e');
+        }
+        
+        // Lấy số tiền được hoàn lại từ response
+        final refundedCoin = response['refundedCoin'] ?? 0;
+        
+        // Sau khi hủy đơn, reload số dư xu nếu có hàm cập nhật
+        if (mounted) {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context, true);
+          }
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã từ chối đơn thành công!')),
+          SnackBar(
+            content: Text('Đã hủy đơn thành công! Số tiền ${refundedCoin} xu đã được hoàn lại vào ví của bạn.'),
+            duration: const Duration(seconds: 4),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Từ chối đơn thất bại!')),
+          const SnackBar(content: Text('Hủy đơn thất bại!')),
         );
       }
     } catch (e) {
@@ -159,23 +180,36 @@ class _HireConfirmationScreenState extends State<HireConfirmationScreen> {
     }
   }
 
-  // Cho phép người thuê hủy đơn
-  Future<void> _cancelOrder() async {
+  // Cho phép player từ chối đơn
+  Future<void> _rejectOrder() async {
     try {
-      final success = await ApiService.rejectHire(widget.orderId);
-      if (success == true) {
+      final response = await ApiService.rejectHire(widget.orderId);
+      if (response != null && response['success'] == true) {
         setState(() { orderStatus = 'REJECTED'; });
+        
+        // Lấy số tiền được hoàn lại từ response
+        final refundedCoin = response['refundedCoin'] ?? 0;
+        
+        // Sau khi từ chối đơn, quay lại màn hình trước
+        if (mounted) {
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context, true);
+          }
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đã hủy đơn thành công!')),
+          SnackBar(
+            content: Text('Đã từ chối đơn thành công! Số tiền ${refundedCoin} xu đã được hoàn lại cho người thuê.'),
+            duration: const Duration(seconds: 4),
+          ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Hủy đơn thất bại!')),
+          const SnackBar(content: Text('Từ chối đơn thất bại!')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi:  e.toString()}')),
+        SnackBar(content: Text('Lỗi: ${e.toString()}')),
       );
     }
   }

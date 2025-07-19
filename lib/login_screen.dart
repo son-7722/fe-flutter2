@@ -223,23 +223,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         : const Text('Đăng nhập', style: TextStyle(fontSize: 18, color: Colors.white)),
                   ),
                 ),
-                const SizedBox(height: 12),
-                // Nút đăng nhập Facebook
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF1877F3),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                    ),
-                    icon: const Icon(Icons.facebook, color: Colors.white),
-                    onPressed: () {},
-                    label: const Text('Đăng nhập bằng Facebook', style: TextStyle(fontSize: 18, color: Colors.white)),
-                  ),
-                ),
                 const SizedBox(height: 16),
                 // Quên mật khẩu
                 GestureDetector(

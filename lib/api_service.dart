@@ -811,7 +811,30 @@ class ApiService {
     return response.statusCode == 200;
   }
 
-  static Future<bool> rejectHire(String orderId) async {
+  static Future<Map<String, dynamic>?> rejectHire(String orderId) async {
+    final token = await storage.read(key: 'jwt');
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/game-players/order/$orderId/reject');
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        if (token != null) 'Authorization': 'Bearer $token',
+      },
+    ).timeout(timeout);
+    
+    if (response.statusCode == 200) {
+      try {
+        final data = jsonDecode(response.body);
+        return data;
+      } catch (e) {
+        return {'success': true};
+      }
+    }
+    return null;
+  }
+
+  // API cho người thuê hủy đơn
+  static Future<Map<String, dynamic>?> cancelOrder(String orderId) async {
     final token = await storage.read(key: 'jwt');
     final url = Uri.parse('${ApiConfig.baseUrl}/api/game-players/order/$orderId/cancel');
     final response = await http.post(
@@ -821,7 +844,16 @@ class ApiService {
         if (token != null) 'Authorization': 'Bearer $token',
       },
     ).timeout(timeout);
-    return response.statusCode == 200;
+    
+    if (response.statusCode == 200) {
+      try {
+        final data = jsonDecode(response.body);
+        return data;
+      } catch (e) {
+        return {'success': true};
+      }
+    }
+    return null;
   }
 
   static Future<bool> deleteNotification(int notificationId) async {
